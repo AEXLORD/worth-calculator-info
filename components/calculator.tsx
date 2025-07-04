@@ -394,17 +394,17 @@ const SalaryCalculator = () => {
   const [showHistory, setShowHistory] = useState(false);
   
   // 在组件挂载时标记为浏览器环境
-  useEffect(() => {
-    setIsBrowser(true);
+  // useEffect(() => {
+  //   setIsBrowser(true);
     
-    // 在客户端环境中执行重定向
-    if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname;
-      if (hostname !== 'worthjob.zippland.com' && hostname !== 'localhost' && !hostname.includes('127.0.0.1')) {
-        window.location.href = 'https://worthjob.zippland.com' + window.location.pathname;
-      }
-    }
-  }, []);
+  //   // 在客户端环境中执行重定向
+  //   if (typeof window !== 'undefined') {
+  //     const hostname = window.location.hostname;
+  //     if (hostname !== 'worthjob.zippland.com' && hostname !== 'localhost' && !hostname.includes('127.0.0.1')) {
+  //       window.location.href = 'https://worthjob.zippland.com' + window.location.pathname;
+  //     }
+  //   }
+  // }, []);
   
   // 添加用于创建分享图片的引用
   const shareResultsRef = useRef<HTMLDivElement>(null);
@@ -631,6 +631,48 @@ const SalaryCalculator = () => {
       return dailySalaryInCNY.toFixed(2);
     }
   }, [calculateDailySalary, selectedCountry]);
+
+  // 保存薪资数据到数据库
+  const saveSalaryToDatabase = useCallback(async (salary: string) => {
+    if (!salary || typeof window === 'undefined') return;
+    
+    try {
+      const response = await fetch('/api/save-salary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ salary }),
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to save salary data');
+      }
+    } catch (error) {
+      console.error('Error saving salary data:', error);
+    }
+  }, []);
+
+  // 保存完整表单数据到数据库
+  const saveFormDataToDatabase = useCallback(async () => {
+    if (!formData.salary || typeof window === 'undefined') return;
+    
+    try {
+      const response = await fetch('/api/save-form-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to save form data');
+      }
+    } catch (error) {
+      console.error('Error saving form data:', error);
+    }
+  }, [formData]);
 
   const handleInputChange = useCallback((name: string, value: string | boolean) => {
     // 触发自定义事件，保存滚动位置
@@ -1220,6 +1262,7 @@ const SalaryCalculator = () => {
                   type="number"
                   value={formData.salary}
                   onChange={(e) => handleInputChange('salary', e.target.value)}
+                  onBlur={(e) => saveSalaryToDatabase(e.target.value)}
                   placeholder={selectedCountry !== 'CN' ? 
                     `${t('salary_placeholder')} ${getCurrencySymbol(selectedCountry)}` : 
                     t('salary_placeholder_cny')}
@@ -1664,7 +1707,12 @@ const SalaryCalculator = () => {
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
               ${formData.salary ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800' : 
               'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'}`}
-            onClick={() => formData.salary ? saveToHistory() : null}
+            onClick={() => {
+              if (formData.salary) {
+                saveToHistory();
+                saveFormDataToDatabase();
+              }
+            }}
           >
             <FileText className="w-4 h-4" />
             {t('view_report')}
