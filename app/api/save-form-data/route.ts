@@ -1,7 +1,6 @@
-import { neon } from "@neondatabase/serverless";
 import { NextRequest, NextResponse } from "next/server";
-import { v4 as uuidv4 } from "uuid";
 import { getClientIp } from "../../../lib/ip-utils";
+import clientPromise from "../../../lib/mongodb";
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,25 +14,23 @@ export async function POST(request: NextRequest) {
     const ip = getClientIp(request);
     
     // 获取当前时间
-    const timestamp = new Date().toISOString();
+    const timestamp = new Date();
     
-    // 生成UUID
-    const id = uuidv4();
+    // 连接MongoDB
+    const client = await clientPromise;
+    const db = client.db("worth-calculator");
     
-    // 连接数据库
-    const sql = neon(process.env.DATABASE_URL!);
+    // 插入数据到MongoDB
+    const result = await db.collection("form_submissions").insertOne({
+      ip,
+      salary: formData.salary,
+      timestamp,
+      action: "form_submit",
+      formData,
+      createdAt: new Date()
+    });
     
-    // 插入数据，将完整表单数据存储在other字段中
-    await sql`
-      INSERT INTO "user-info" (id, ip, salary, other)
-      VALUES (${id}, ${ip}, ${formData.salary}, ${JSON.stringify({
-        timestamp,
-        action: "form_submit",
-        formData
-      })})
-    `;
-    
-    return NextResponse.json({ success: true, id });
+    return NextResponse.json({ success: true, id: result.insertedId });
   } catch (error) {
     console.error("Error saving form data:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
